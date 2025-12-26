@@ -39,12 +39,13 @@ void Executor_Run(
    }
    else // CLOSE
    {
-      // CLOSE is executed literally.
-      // No position inspection, no semantic correction.
+      // CLOSE: decision.direction is the direction of the position to be closed.
+      // +1 (BUY position)  -> close by SELL deal
+      // -1 (SELL position) -> close by BUY deal
       if(decision.direction > 0)
-         req.type = ORDER_TYPE_BUY;
-      else
          req.type = ORDER_TYPE_SELL;
+      else
+         req.type = ORDER_TYPE_BUY;
    }
 
    // --- no price selection ---
@@ -59,7 +60,12 @@ void Executor_Run(
    out_result.price         = 0.0;
 
    if(!ok)
+   {
+      if(res.retcode == TRADE_RETCODE_REJECT)
+         out_result.status = REJECTED;  // broker rejected the request
+      // else остаётся FAILED (уже выставлен по умолчанию)
       return;
+   }
 
    const double filled = res.volume;
    const double price  = res.price;

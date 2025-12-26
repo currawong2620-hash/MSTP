@@ -44,10 +44,20 @@ void Observer_Run(
    out_snapshot.market.low    = iLow(symbol, tf, 0);
    out_snapshot.market.close  = iClose(symbol, tf, 0);
    out_snapshot.market.volume = iVolume(symbol, tf, 0);
+   
+   // --- last closed bars (Lexicon v1.2, FACTUAL, no interpretation)
+   out_snapshot.market.last_closes[0] = iClose(symbol, tf, 1);
+   out_snapshot.market.last_closes[1] = iClose(symbol, tf, 2);
+   out_snapshot.market.last_closes[2] = iClose(symbol, tf, 3);
+
 
    out_snapshot.market.bid    = SymbolInfoDouble(symbol, SYMBOL_BID);
    out_snapshot.market.ask    = SymbolInfoDouble(symbol, SYMBOL_ASK);
    out_snapshot.market.spread = out_snapshot.market.ask - out_snapshot.market.bid;
+   
+   // --- environment fact: minimal price step (Lexicon-compliant)
+   out_snapshot.market.point_size =
+      SymbolInfoDouble(symbol, SYMBOL_POINT);
 
    out_snapshot.constraints.min_lot  = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
    out_snapshot.constraints.lot_step = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);

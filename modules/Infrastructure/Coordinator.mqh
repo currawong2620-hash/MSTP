@@ -88,23 +88,22 @@ void Coordinator_RunCycle(
    // Trace
    out_intent = intent;
 
-   //-----------------------------------------------------------------
-   // Short-circuit: NO_ACTION
-   //-----------------------------------------------------------------
-   if(intent.type == NO_ACTION)
+   // Short-circuit allowed ONLY when there is no position.
+   // If a position exists, PPM must still run to enforce virtual SL/TP.
+   if(intent.type == NO_ACTION && !out_snapshot.position.has_position)
    {
-      Print("[Coordinator] Short-circuit: NO_ACTION");
-
+      Print("[Coordinator] Short-circuit: NO_ACTION (no position)");
+   
       ExecutionResult empty_results[];
       ArrayResize(empty_results, 0);
-
+   
       Print("[Coordinator] (6) FeedbackSource");
       out_feedback.event   = (feedback_event)0;
       out_feedback.pnl     = 0.0;
       out_feedback.message = "";
-
+   
       FeedbackSource_Run(empty_results, 0, out_feedback);
-
+   
       g_coordinator_last_feedback = out_feedback;
       g_coordinator_has_feedback  = true;
       return;

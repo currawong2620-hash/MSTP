@@ -1,0 +1,296 @@
+# SSP — SACRED SYSTEM PACT
+## Trading Platform Architecture Law v1.0
+
+**Status:** NORMATIVE (LAW)  
+**Scope:** Entire system  
+**Audience:** Developer, Master-Chat, Audit-Chat  
+**Change policy:** ONLY by version increment  
+**Supersedes:** none
+
+---
+
+## 0. Назначение
+
+Этот документ определяет **исчерпывающий архитектурный закон системы**.
+
+Он фиксирует:
+- допустимые роли,
+- допустимые типы данных,
+- допустимые направления взаимодействий,
+- запреты.
+
+Всё, что **не разрешено явно**, считается **ЗАПРЕЩЁННЫМ**.
+
+---
+
+## 1. Архитектурная модель
+
+Система строится как **последовательность ролей**, взаимодействующих
+**ТОЛЬКО через контрактные типы данных**.
+
+Архитектура **НЕ описывается через модули**.
+
+---
+
+## 2. Роли системы (FIXED SET)
+
+В системе существуют **ТОЛЬКО следующие роли**:
+
+1. `Observer`
+2. `DecisionMaker`
+3. `PositionPolicyManager`
+4. `RiskArbiter`
+5. `Executor`
+6. `FeedbackSource`
+7. `Coordinator`
+
+Добавление новых ролей **ЗАПРЕЩЕНО**.
+
+---
+
+## 3. Заменяемость ролей (Multi-Strategy Model)
+
+Заменяемыми (плагин-ролями) являются **ТОЛЬКО**:
+
+- `DecisionMaker`
+- `PositionPolicyManager`
+- `RiskArbiter`
+
+Все остальные роли **НЕ заменяемы** и относятся к инфраструктуре.
+
+---
+
+## 4. Архитектурные типы данных (FIXED SET)
+
+В системе допускаются **ТОЛЬКО** следующие типы данных:
+
+1. `Snapshot`
+2. `Intent`
+3. `PolicyAdjustedIntent`
+4. `Decision`
+5. `ExecutionResult`
+6. `Feedback`
+
+Использование любых иных типов для межролевого взаимодействия
+считается **архитектурным нарушением**.
+
+---
+
+## 5. Контракты ролей
+
+### 5.1 Observer
+
+**Создаёт:**  
+- `Snapshot`
+
+**Читает:**  
+- ничего
+
+**Запреты:**  
+- не принимает решений  
+- не знает про стратегию  
+- не знает про исполнение  
+
+---
+
+### 5.2 DecisionMaker
+
+**Читает:**  
+- `Snapshot`
+- `Feedback`
+
+**Создаёт:**  
+- `Intent`
+
+**Запреты:**  
+- не видит `ExecutionResult`  
+- не знает про ордера  
+- не управляет позицией  
+
+---
+
+### 5.3 PositionPolicyManager
+
+**Читает:**  
+- `Intent`
+- `Snapshot.position`
+- `Feedback`
+MAY read Snapshot.market prices
+solely for position lifecycle exit policy
+MAY read Snapshot.position.trailing_stop_price
+as a factual lifecycle attribute (read-only)
+
+**Создаёт:**  
+- `PolicyAdjustedIntent` (0..N)
+
+**Запреты:**  
+- MUST NOT perform market interpretation or signal generation.  
+- не формирует Intent  
+- не исполняет сделки  
+
+---
+
+### 5.4 RiskArbiter
+
+**Читает:**  
+- `PolicyAdjustedIntent`
+- `Snapshot` (ограниченно)
+
+**Создаёт:**  
+- `Decision`
+
+**Запреты:**  
+- не знает стратегической логики  
+- не исполняет сделки  
+
+---
+
+### 5.5 Executor
+
+**Читает:**  
+- `Decision`
+
+**Создаёт:**  
+- `ExecutionResult`
+
+**Запреты:**  
+- не принимает решений  
+- не интерпретирует рынок  
+- не знает стратегию  
+
+---
+
+### 5.6 FeedbackSource
+
+**Читает:**  
+- `ExecutionResult`
+- состояние позиции
+
+**Создаёт:**  
+- `Feedback`
+
+**Запреты:**  
+- не принимает решений  
+- не управляет исполнением  
+
+---
+
+### 5.7 Coordinator
+
+**Функция:**  
+- управляет порядком вызовов ролей
+
+**Запреты:**  
+- не изменяет данные  
+- не принимает решений  
+- не интерпретирует рынок  
+
+---
+
+## 6. Нормативный поток данных (MANDATORY)
+
+```
+
+Observer
+→ Snapshot
+DecisionMaker
+→ Intent
+PositionPolicyManager
+→ PolicyAdjustedIntent(s)
+RiskArbiter
+→ Decision
+Executor
+→ ExecutionResult
+FeedbackSource
+→ Feedback
+↺ (к DecisionMaker)
+
+```
+
+Любое отклонение от этого порядка — **НАРУШЕНИЕ SSP**.
+Environment constants such as _Point
+are considered stable execution facts
+and MAY be used by infrastructure-independent roles
+if they do not introduce hidden state or history.
+
+---
+
+## 7. Naming & Lexicon Compliance
+
+- Все имена типов и полей **ОБЯЗАНЫ** соответствовать:
+  - `NAMING_RULES v1.0`
+  - `CONTRACT_LEXICON v1.0`
+
+Использование имён, отсутствующих в Lexicon,
+считается **архитектурным дефектом**.
+
+---
+
+## 8. Snapshot Rules
+
+- `Snapshot` является **immutable**
+- не содержит логики
+- не содержит ссылок на среду исполнения
+- представляет **один момент времени**
+
+Модификация Snapshot после создания **ЗАПРЕЩЕНА**.
+
+---
+
+## 9. Intent Rules
+
+- `Intent` выражает **желание**, а не приказ
+- не содержит SL/TP
+- не содержит механики исполнения
+- не гарантирует результата
+
+---
+
+## 10. Запрещённые зависимости (CRITICAL)
+
+Запрещено:
+
+- `DecisionMaker → Executor`
+- `DecisionMaker → Decision`
+- `DecisionMaker → PolicyAdjustedIntent`
+- `Executor → Intent`
+- `Observer → Intent`
+- любая роль → MT5 API, кроме Executor
+
+---
+
+## 11. Визуальная наблюдаемость (MANDATORY)
+
+Каждая роль **ОБЯЗАНА** иметь визуальный тестер,
+который отображает **ТОЛЬКО её выходной тип данных**.
+
+Визуальный тестер:
+- read-only
+- не влияет на поток
+- не содержит логики
+
+Отсутствие визуального тестера считается
+**архитектурной неполнотой**.
+
+---
+
+## 12. Правила изменения SSP
+
+- SSP **НЕ редактируется**
+- изменения возможны **ТОЛЬКО** через новую версию
+- реализация всегда подчиняется SSP, а не наоборот
+
+---
+
+## 13. Статус закона
+
+Этот документ является **единственным источником истины**
+о допустимой архитектуре системы.
+
+Любой код, не соответствующий SSP,
+подлежит отклонению **без обсуждения**.
+
+---
+
+**END OF SSP v1.0**
+```

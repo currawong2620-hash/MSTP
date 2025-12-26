@@ -1,17 +1,126 @@
 //+------------------------------------------------------------------+
-//| ArchitectureTypes.mqh — Architecture Data Types v1.0             |
-//| Infrastructure / Contract Projection                              |
-//| STRICT MQL5, no #pragma once                                      |
-//| Single Source: CONTRACT_LEXICON v1.0                              |
+//| ArchitectureTypes.mqh — Architecture Contracts v3.0              |
+//| SSP v3.0 / CONTRACT_LEXICON v3.0 compliant                        |
+//| STRICT MQL5                                                      |
+//| NO #pragma once                                                  |
 //+------------------------------------------------------------------+
 #ifndef __ARCHITECTURE_TYPES_MQH__
 #define __ARCHITECTURE_TYPES_MQH__
 
 //--------------------------------------------------------------------
-// ENUMS (exactly as in CONTRACT_LEXICON)
+// Direction (shared semantic enum)
 //--------------------------------------------------------------------
+enum direction
+{
+   DIR_SHORT = -1,
+   DIR_FLAT  =  0,
+   DIR_LONG  =  1
+};
 
-// Intent categories
+//--------------------------------------------------------------------
+// Trend regime (multi-timeframe dataset)
+//--------------------------------------------------------------------
+enum trend_regime
+{
+   TREND   = 0,
+   RANGE   = 1,
+   UNKNOWN = 2
+};
+
+//--------------------------------------------------------------------
+// TrendInfo — single timeframe trend descriptor
+//--------------------------------------------------------------------
+struct TrendInfo
+{
+   ENUM_TIMEFRAMES timeframe;   // timeframe of this record
+   trend_regime    regime;      // TREND / RANGE / UNKNOWN
+   direction       direction;   // -1 / 0 / +1
+   double          confidence;  // 0.0 .. 1.0
+};
+
+//--------------------------------------------------------------------
+// Snapshot.trends container
+//--------------------------------------------------------------------
+struct SnapshotTrends
+{
+   int       count;     // number of timeframe records
+   TrendInfo items[];   // ordered array (input order)
+};
+
+//--------------------------------------------------------------------
+// Snapshot.market
+//--------------------------------------------------------------------
+struct SnapshotMarket
+{
+   string           symbol;
+   ENUM_TIMEFRAMES  tf;
+
+   double open;
+   double high;
+   double low;
+   double close;
+
+   double volume;
+
+   double bid;
+   double ask;
+   double spread;
+
+   double last_closes[3];   // closed bars only
+
+   double point_size;
+};
+
+//--------------------------------------------------------------------
+// Snapshot.position
+//--------------------------------------------------------------------
+struct SnapshotPosition
+{
+   bool      has_position;
+   direction direction;
+   double    volume;
+   double    entry_price;
+   double    floating_pnl;
+   double    trailing_stop_price;
+};
+
+//--------------------------------------------------------------------
+// Snapshot.time
+//--------------------------------------------------------------------
+struct SnapshotTime
+{
+   datetime timestamp;
+   bool     is_new_bar;
+   int      bars_since_entry;
+   int      bars_since_last_action;
+};
+
+//--------------------------------------------------------------------
+// Snapshot.constraints
+//--------------------------------------------------------------------
+struct SnapshotConstraints
+{
+   double min_lot;
+   double lot_step;
+   double min_stop;
+   bool   is_trading_allowed;
+};
+
+//--------------------------------------------------------------------
+// Snapshot — root architecture type
+//--------------------------------------------------------------------
+struct Snapshot
+{
+   SnapshotMarket      market;
+   SnapshotPosition    position;
+   SnapshotTime        time;
+   SnapshotConstraints constraints;
+   SnapshotTrends      trends;
+};
+
+//--------------------------------------------------------------------
+// Intent
+//--------------------------------------------------------------------
 enum intent_type
 {
    NO_ACTION = 0,
@@ -20,21 +129,53 @@ enum intent_type
    WANT_HOLD
 };
 
-// Decision status
+struct Intent
+{
+   intent_type type;
+   direction   direction;
+   double      confidence;
+};
+
+//--------------------------------------------------------------------
+// PolicyAdjustedIntent
+//--------------------------------------------------------------------
+struct PolicyAdjustedIntent
+{
+   intent_type type;
+   direction   direction;
+   double      volume;
+   string      tag;
+};
+
+//--------------------------------------------------------------------
+// Decision
+//--------------------------------------------------------------------
 enum decision_status
 {
-   ACCEPT = 0,
-   REJECT,
-   MODIFY
+   DECISION_ACCEPT = 0,
+   DECISION_REJECT,
+   DECISION_MODIFY
 };
 
 enum decision_action
 {
-   OPEN = 0,
-   CLOSE
+   ACTION_OPEN = 0,
+   ACTION_CLOSE
 };
 
-// Execution status
+struct Decision
+{
+   decision_status status;
+   decision_action action;
+   direction       direction;
+   double          volume;
+   string          symbol;
+   string          reason;
+};
+
+//--------------------------------------------------------------------
+// ExecutionResult
+//--------------------------------------------------------------------
 enum execution_status
 {
    EXECUTED = 0,
@@ -43,7 +184,16 @@ enum execution_status
    FAILED
 };
 
-// Feedback events
+struct ExecutionResult
+{
+   execution_status status;
+   double           filled_volume;
+   double           price;
+};
+
+//--------------------------------------------------------------------
+// Feedback
+//--------------------------------------------------------------------
 enum feedback_event
 {
    POSITION_OPENED = 0,
@@ -53,110 +203,20 @@ enum feedback_event
    ACTION_REJECTED
 };
 
-//--------------------------------------------------------------------
-// SNAPSHOT SUBSTRUCTURES
-//--------------------------------------------------------------------
-
-// Snapshot.market
-struct MarketSnapshot
-{
-   string symbol;
-   int    tf;
-   double open;
-   double high;
-   double low;
-   double close;
-   double volume;
-   double bid;
-   double ask;
-   double spread;
-};
-
-// Snapshot.position
-struct PositionSnapshot
-{
-   bool   has_position;
-   int    direction;        // -1 / +1
-   double volume;
-   double entry_price;
-   double floating_pnl;
-};
-
-// Snapshot.time
-struct TimeContext
-{
-   long timestamp;
-   bool is_new_bar;
-   int  bars_since_entry;
-   int  bars_since_last_action;
-};
-
-// Snapshot.constraints
-struct MarketConstraints
-{
-   double min_lot;
-   double lot_step;
-   double min_stop;
-   bool   is_trading_allowed;
-};
-
-//--------------------------------------------------------------------
-// ARCHITECTURAL ROOT TYPES
-//--------------------------------------------------------------------
-
-// Snapshot
-struct Snapshot
-{
-   MarketSnapshot    market;
-   PositionSnapshot  position;
-   TimeContext       time;
-   MarketConstraints constraints;
-};
-
-// Intent
-struct Intent
-{
-   intent_type type;
-   int         direction;   // -1 / 0 / +1
-   double      confidence;  // 0.0 .. 1.0
-};
-
-// PolicyAdjustedIntent
-struct PolicyAdjustedIntent
-{
-   intent_type type;
-   int         direction;
-   double      volume;
-   string      tag;
-};
-
-// direction semantic type already used in your system: -1 / 0 / +1
-// (type name must match your existing Lexicon / ArchitectureTypes conventions)
-
-struct Decision
-{
-   decision_status status;
-   decision_action action;
-   int             direction;  // -1 / 0 / +1
-   double          volume;
-   string          symbol;
-   string          reason;
-};
-
-// ExecutionResult
-struct ExecutionResult
-{
-   execution_status status;
-   double           filled_volume;
-   double           price;
-};
-
-// Feedback
 struct Feedback
 {
    feedback_event event;
    double         pnl;
    string         message;
 };
+
+struct TrendAnalysisResult
+{
+  ENUM_TIMEFRAMES timeframe;
+  trend_regime    regime;
+  int             direction;   // semantically compatible with CONTRACT_LEXICON.direction
+  double          confidence;
+};
+
 
 #endif // __ARCHITECTURE_TYPES_MQH__
